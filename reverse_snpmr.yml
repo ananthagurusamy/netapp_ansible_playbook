@@ -1,0 +1,127 @@
+---
+- hosts: localhost
+  gather_facts: false
+  collections:
+  - netapp.ontap
+  vars:
+    hostname: cluster1.demo.netapp.com
+    vserver: svm1
+    username: admin
+    password: Netapp1!
+    src_volume: vol_src
+    dst_volume: vol_dst
+    src_vserver: svm1
+    dst_vserver: svm1
+    dst_aggr: cluster1_01_SSD_1
+    src_cluster: cluster1.demo.netapp.com
+    dst_cluster: cluster1.demo.netapp.com
+    https: true
+    validate_certs: false
+  tasks:
+  - name: Create Source Volume
+    na_ontap_volume: 
+      state: present
+      name: "{{ src_volume }}"
+      aggregate_name: "{{ dst_aggr }}"
+      size: 1
+      size_unit: gb
+      type: RW
+      vserver: "{{ src_vserver }}"
+      hostname: "{{ src_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+  - name: Create destination DP Volume
+    na_ontap_volume:
+      state: present
+      name: "{{ dst_volume }}"
+      is_infinite: False
+      aggregate_name: "{{ dst_aggr }}"
+      size: 1
+      size_unit: gb
+      type: DP
+      vserver: "{{ dst_vserver }}"
+      hostname: "{{ dst_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+  - name: pause the playbook for a minute
+    wait_for:
+      timeout: 15
+  - name: Create SnapMirror
+    na_ontap_snapmirror:
+      state: present
+      source_volume: "{{ src_volume }}"
+      destination_volume: "{{ dst_volume }}"
+      source_vserver: "{{ src_vserver }}"
+      destination_vserver: "{{ dst_vserver }}"
+      hostname: "{{ dst_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+  - name: "pause the playbook before breaking the snapmirror. So that I can check the status of the Snapmirror HEALTH"
+    wait_for:
+      timeout: 15
+  - name: Break Snapmirror
+    na_ontap_snapmirror:
+      state: present
+      source_volume: "{{ src_volume }}"
+      destination_volume: "{{ dst_volume }}"
+      source_vserver: "{{ src_vserver }}"
+      destination_vserver: "{{ dst_vserver }}"
+      relationship_state: broken
+      hostname: "{{ dst_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+  - name: "pause the playbook before reversing the snapmirror. So that I can check the status of the BROKEN Snapmirror"
+    wait_for:
+      timeout: 15
+  - name: Create Reverse SnapMirror
+    na_ontap_snapmirror:
+      state: present
+      source_volume: "{{ dst_volume }}"
+      destination_volume: "{{ src_volume }}"
+      source_vserver: "{{ dst_vserver }}"
+      destination_vserver: "{{ src_vserver }}"
+      schedule: hourly
+      policy: MirrorAllSnapshots
+      initialize: False
+      hostname: "{{ src_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+  - name: Resync the Reversed snapmirror
+    na_ontap_snapmirror:
+      state: present
+      source_volume: "{{ dst_volume }}"
+      destination_volume: "{{ src_volume }}"
+      source_vserver: "{{ dst_vserver }}"
+      destination_vserver: "{{ src_vserver }}"
+      relationship_state: active
+      initialize: False
+      hostname: "{{ src_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+  - name: Delete the old snapmirror relation
+    na_ontap_snapmirror:
+      state: absent
+      source_hostname: "{{ src_cluster }}"
+      source_volume: "{{ src_volume }}"
+      destination_volume: "{{ dst_volume }}"
+      source_vserver: "{{ src_vserver }}"
+      destination_vserver: "{{ dst_vserver }}"
+      relationship_info_only: true
+      hostname: "{{ dst_cluster }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      https: true
+      validate_certs: false
+
