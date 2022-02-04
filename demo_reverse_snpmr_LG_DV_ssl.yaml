@@ -3,7 +3,6 @@
   gather_facts: false
   collections:
   - netapp.ontap
-
   vars:
     hostname: NTAPCL01
     vserver: svm_data
@@ -45,9 +44,6 @@
       key_filepath: "{{ kpath }}"
       cert_filepath: "{{ fpath }}"  
       validate_certs: false
-  - name: "pause the playbook before reversing the snapmirror. So that I can check the status of the BROKEN Snapmirror"
-    wait_for:
-      timeout: 15
   - name: Create Reverse SnapMirror
     na_ontap_snapmirror:
       state: present
@@ -62,7 +58,7 @@
       key_filepath: "{{ kpath }}"
       cert_filepath: "{{ fpath }}"  
       validate_certs: false
-  - name: Resync the Reversed snapmirror
+  - name: Resync
     na_ontap_snapmirror:
       state: present
       source_volume: "{{ dst_volume }}"
@@ -75,7 +71,7 @@
       key_filepath: "{{ kpath }}"
       cert_filepath: "{{ fpath }}"  
       validate_certs: false
-  - name: Delete the old snapmirror relation
+  - name: Delete the old snapmirror
     na_ontap_snapmirror:
       state: absent
       source_hostname: "{{ src_cluster }}"
